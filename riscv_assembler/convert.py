@@ -104,7 +104,7 @@ class AssemblyConverter:
         "bmmi_shr",
         "bmmi_shl",
         "bmmi_halt",
-        "bmmi_mmul",
+        "bmmi_mul",
         "div",
         "divu",
         "rem",

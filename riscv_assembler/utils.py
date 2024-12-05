@@ -54,7 +54,7 @@ class Toolkit:
             "mulh",
             "mulu",
             "mulsu",
-            "bmmi_mmul",
+            "bmmi_mul",
             "bmmi_add",
             "bmmi_sub",
             "bmmi_mov",
