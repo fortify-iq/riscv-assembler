@@ -113,7 +113,7 @@ class Toolkit:
             "CSRRCI",
         ]
         S_instr = ["sw", "sb", "sh", "sd"]
-        SB_instr = ["beq", "bne", "blt", "bge", "bltu", "bgeu"]
+        SB_instr = ["beq", "bne", "blt", "bge", "bltu", "bgeu", "bmmi_beq", "bmmi_bne"]
         U_instr = ["auipc", "lui"]
         UJ_instr = ["jal"]
         pseudo_instr = [
