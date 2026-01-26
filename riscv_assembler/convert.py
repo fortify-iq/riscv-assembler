@@ -200,7 +200,6 @@ class AssemblyConverter:
         if filename != "":
             self.code = self.__read_in_advance()
 
-        # print(len(self.code))
         self.nibble = nibble
         # get instruction data and register mapping
         self.r_map, self.instr_data = self.__pre()
@@ -606,7 +605,6 @@ class AssemblyConverter:
                     self.__reg_map(clean[1]),
                 )
             )
-            # print(res)
         elif clean[0] in self.I_instr:
             if clean[0] == "jalr":
                 if len(clean) == 4:
@@ -634,14 +632,11 @@ class AssemblyConverter:
                         clean[0], self.__reg_map(clean[2]), clean[3], self.__reg_map(clean[1])
                     )
                 )
-            # print(res)
         elif clean[0] in self.S_instr:
             res.append(
                 self.S_type(clean[0], self.__reg_map(clean[3]), self.__reg_map(clean[1]), clean[2])
             )
-            # print(res)
         elif clean[0] in self.SB_instr:
-            #print("Creating a branch instruction: " + str(clean) + " calculated offset: " + str(self.calcJump(clean[3], i)))
             res.append(
                 self.SB_type(
                     clean[0],
@@ -650,7 +645,6 @@ class AssemblyConverter:
                     self.calcJump(clean[3], i),
                 )
             )
-            # print(res)
         elif clean[0] in self.U_instr:
             res.append(self.U_type(clean[0], clean[2], self.__reg_map(clean[1])))
         elif clean[0] in self.UJ_instr:
@@ -662,9 +656,7 @@ class AssemblyConverter:
                 res.append(
                     self.UJ_type(clean[0], self.calcJump(clean[1], i), self.__reg_map("x1"))
                 )
-            # print(res)
         elif clean[0] in self.pseudo_instr:
-            # print(clean[0]  + " pseudo")
 
             if clean[0] == "li":
                 imm = int(clean[2])
