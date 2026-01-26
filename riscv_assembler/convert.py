@@ -222,25 +222,39 @@ class AssemblyConverter:
         """Count how many real instructions a source line produces (accounting for pseudo-instructions)"""
         line = self.__handle_inline_comments(line)
         line = line.strip()
-        
+
         # Skip labels and empty lines
         if line == "" or line.endswith(":"):
             return 0
-        
+
         # Parse the instruction
         clean = flatten([elem.replace("\n", "").split(",") for elem in line.split(" ")])
         while "" in clean:
             clean.remove("")
-        
+
         if not clean or not self.__valid_line(clean):
             return 0
-        
+
         instr = clean[0]
-        
-        # li expands to 2 instructions (lui + addi)
+
+        # li expands to 1 or 2 instructions depending on immediate size
         if instr == "li":
+            # Handle hex values
+            imm_str = clean[2]
+            if imm_str.startswith("0x"):
+                imm = int(imm_str, 16)
+            else:
+                imm = int(imm_str)
+            # Small immediates (-2048 to 2047) use single addi
+            if -2048 <= imm <= 2047:
+                return 1
+            else:
+                return 2
+
+        # la always expands to 2 instructions (auipc + addi)
+        if instr == "la":
             return 2
-        
+
         # All other valid instructions are 1 real instruction
         return 1
 
@@ -576,16 +590,8 @@ class AssemblyConverter:
         if clean[0] == "ecall":
             return [-1]
 
-        if (
-            clean[0] == "sw"
-            or clean[0] == "lw"
-            or clean[0] == "lb"
-            or clean[0] == "lh"
-            or clean[0] == "lbu"
-            or clean[0] == "lhu"
-            or clean[0] == "sb"
-            or clean[0] == "sh"
-        ):
+        elif clean[0] in ["lw", "lb", "lh", "lbu", "lhu"]:
+
             # sw s0, 0(sp)
             w_spl = clean[2].split("(")
             clean[2] = w_spl[0]
@@ -661,11 +667,16 @@ class AssemblyConverter:
             # print(clean[0]  + " pseudo")
 
             if clean[0] == "li":
-                upper20 = (int(clean[2]) + 0x800) >> 12
-                lower12 = int(clean[2]) - (upper20 << 12)
-                #print("instruction" + str(clean) + " converted to lui " + str(hex(upper20)) + " and addi " + str(hex(lower12)))
-                res.append(self.U_type(instr="lui", imm=upper20, rd=self.__reg_map(clean[1])))
-                res.append(self.I_type(instr="addi", imm=lower12, rd=self.__reg_map(clean[1]), rs1=self.__reg_map(clean[1])))
+                imm = int(clean[2])
+                # Small immediates (-2048 to 2047) can use a single addi with x0
+                if -2048 <= imm <= 2047:
+                    res.append(self.I_type("addi", self.__reg_map("x0"), clean[2], self.__reg_map(clean[1])))
+                else:
+                    # Large immediates need lui + addi
+                    upper20 = (imm + 0x800) >> 12
+                    lower12 = imm - (upper20 << 12)
+                    res.append(self.U_type(instr="lui", imm=upper20, rd=self.__reg_map(clean[1])))
+                    res.append(self.I_type(instr="addi", imm=lower12, rd=self.__reg_map(clean[1]), rs1=self.__reg_map(clean[1])))
             elif clean[0] == "nop":
                 res.append(self.I_type("addi", self.__reg_map("x0"), "0", self.__reg_map("x0")))
             elif clean[0] == "mv":
@@ -686,9 +697,12 @@ class AssemblyConverter:
                     )
                 )
             elif clean[0] == "la":
-                res.append(
-                    self.U_type("auipc", self.calcJump(clean[2], i), self.__reg_map(clean[1]))
-                )
+                # la expands to auipc + addi for PC-relative addressing
+                offset = self.calcJump(clean[2], i)
+                upper20 = (offset + 0x800) >> 12
+                lower12 = offset - (upper20 << 12)
+                res.append(self.U_type("auipc", upper20, self.__reg_map(clean[1])))
+                res.append(self.I_type("addi", self.__reg_map(clean[1]), lower12, self.__reg_map(clean[1])))
             elif clean[0] == "j":
                 res.append(self.UJ_type("jal", self.calcJump(clean[1], i), self.__reg_map("x0")))
             elif clean[0] == "jr":
@@ -713,6 +727,41 @@ class AssemblyConverter:
                         self.__reg_map(clean[2]),
                         self.__reg_map(clean[1]),
                         self.calcJump(clean[3], i),
+                    )
+                )
+            elif clean[0] == "beqz":
+                # beqz rs, offset -> beq rs, x0, offset
+                res.append(
+                    self.SB_type(
+                        "beq",
+                        self.__reg_map(clean[1]),
+                        self.__reg_map("x0"),
+                        self.calcJump(clean[2], i),
+                    )
+                )
+            elif clean[0] == "bnez":
+                # bnez rs, offset -> bne rs, x0, offset
+                res.append(
+                    self.SB_type(
+                        "bne",
+                        self.__reg_map(clean[1]),
+                        self.__reg_map("x0"),
+                        self.calcJump(clean[2], i),
+                    )
+                )
+            elif clean[0] == "seqz":
+                # seqz rd, rs -> sltiu rd, rs, 1
+                res.append(
+                    self.I_type("sltiu", self.__reg_map(clean[2]), "1", self.__reg_map(clean[1]))
+                )
+            elif clean[0] == "snez":
+                # snez rd, rs -> sltu rd, x0, rs
+                res.append(
+                    self.R_type(
+                        "sltu",
+                        self.__reg_map("x0"),
+                        self.__reg_map(clean[2]),
+                        self.__reg_map(clean[1]),
                     )
                 )
         else:
