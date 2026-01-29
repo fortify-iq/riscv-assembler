@@ -591,6 +591,13 @@ class AssemblyConverter:
 
         elif clean[0] in ["lw", "lb", "lh", "lbu", "lhu"]:
 
+            # lw s0, 0(sp)
+            w_spl = clean[2].split("(")
+            clean[2] = w_spl[0]
+            clean.append(w_spl[1].replace(")", ""))
+
+        elif clean[0] in ["sw", "sb", "sh"]:
+
             # sw s0, 0(sp)
             w_spl = clean[2].split("(")
             clean[2] = w_spl[0]
