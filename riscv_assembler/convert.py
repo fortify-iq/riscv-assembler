@@ -200,7 +200,6 @@ class AssemblyConverter:
         if filename != "":
             self.code = self.__read_in_advance()
 
-        # print(len(self.code))
         self.nibble = nibble
         # get instruction data and register mapping
         self.r_map, self.instr_data = self.__pre()
@@ -217,29 +216,71 @@ class AssemblyConverter:
     def __reg_to_bin(self, x):
         return self.__binary(int(x[1::]), 5)
 
+    # helper method to count real instructions a source line produces
+    def __count_instr_size(self, line):
+        """Count how many real instructions a source line produces (accounting for pseudo-instructions)"""
+        line = self.__handle_inline_comments(line)
+        line = line.strip()
+
+        # Skip labels and empty lines
+        if line == "" or line.endswith(":"):
+            return 0
+
+        # Parse the instruction
+        clean = flatten([elem.replace("\n", "").split(",") for elem in line.split(" ")])
+        while "" in clean:
+            clean.remove("")
+
+        if not clean or not self.__valid_line(clean):
+            return 0
+
+        instr = clean[0]
+
+        # li expands to 1 or 2 instructions depending on immediate size
+        if instr == "li":
+            # Handle hex values
+            imm_str = clean[2]
+            if imm_str.startswith("0x"):
+                imm = int(imm_str, 16)
+            else:
+                imm = int(imm_str)
+            # Small immediates (-2048 to 2047) use single addi
+            if -2048 <= imm <= 2047:
+                return 1
+            else:
+                return 2
+
+        # la always expands to 2 instructions (auipc + addi)
+        if instr == "la":
+            return 2
+
+        # All other valid instructions are 1 real instruction
+        return 1
+
     # for jumps, calculates hex address of func
     def calcJump(self, x, line_num):
+        """Calculate jump offset accounting for pseudo-instructions that expand to multiple real instructions"""
+        # Get the size of the current branch/jump instruction
+        branch_instr_size = self.__count_instr_size(self.code[line_num]) * 4
+        
         # search forward
-        skip_labels = 0
-        for i in range(line_num, len(self.code)):
+        # Start with the branch instruction's size (offset from branch to next instruction)
+        byte_offset = branch_instr_size
+        for i in range(line_num + 1, len(self.code)):
             if x + ":" == self.code[i]:
-                jump_size = (i - line_num - skip_labels) * 4  # instructions to jump ahead
-                return jump_size
-            if self.code[i].endswith(":"):
-                skip_labels += 1
+                return byte_offset
+            byte_offset += self.__count_instr_size(self.code[i]) * 4
 
         # search backward
-        skip_labels = 0
-        for i in range(line_num, -1, -1):
-            # substruct correct label itself
-            if self.code[i].endswith(":"):
-                skip_labels += 1
+        byte_offset = 0
+        for i in range(line_num - 1, -1, -1):
             if x + ":" == self.code[i]:
-                jump_size = (i - line_num + skip_labels) * 4  # instructions to jump behind
-                return jump_size
+                # Return negative offset for backward jumps
+                return -byte_offset
+            byte_offset += self.__count_instr_size(self.code[i]) * 4
 
-        # print("Address not found")
-        return -10  # if not found
+        # if not found
+        return -10
 
     def __binary(self, x, size):
         byte_num = m.ceil(size / 8)
@@ -326,6 +367,16 @@ class AssemblyConverter:
         f3 = 1
         f7 = 2
         mod_imm = int(imm) - ((int(imm) >> 12) << 12)  # imm[11:0]
+
+        # handle shift instructions with shamt - special encoding
+        if instr in ["slli", "srli", "srai",]:
+            shamt = int(imm) - ((int(imm) >> 5) << 5)  # imm[4:0]
+            mod_imm = shamt  # imm[4:0]
+            if instr in ["srai"]:
+                mod_imm += 0b0100000 << 5 # set funct7 and srai
+            elif instr in ["srli", "slli"]:
+                mod_imm += 0b0000000 << 5 # set funct7 for srli and slli
+
         return "".join(
             [
                 # self.__binary(int(imm),12),
@@ -397,7 +448,7 @@ class AssemblyConverter:
         f3 = 1
         f7 = 2
 
-        mod_imm = int(imm) >> 12
+        mod_imm = int(imm) #>> 12
         return "".join(
             [
                 # self.__binary(int(imm),32)[::-1][12:32][::-1],
@@ -538,14 +589,8 @@ class AssemblyConverter:
         if clean[0] == "ecall":
             return [-1]
 
-        if (
-            clean[0] == "sw"
-            or clean[0] == "lw"
-            or clean[0] == "lb"
-            or clean[0] == "lh"
-            or clean[0] == "sb"
-            or clean[0] == "sh"
-        ):
+        elif clean[0] in ["lw", "lb", "lh", "lbu", "lhu"]:
+
             # sw s0, 0(sp)
             w_spl = clean[2].split("(")
             clean[2] = w_spl[0]
@@ -560,7 +605,6 @@ class AssemblyConverter:
                     self.__reg_map(clean[1]),
                 )
             )
-            # print(res)
         elif clean[0] in self.I_instr:
             if clean[0] == "jalr":
                 if len(clean) == 4:
@@ -576,7 +620,7 @@ class AssemblyConverter:
                     res.append(
                         self.I_type(clean[0], self.__reg_map(clean[1]), "0", self.__reg_map("x1"))
                     )
-            elif clean[0] == "lw":
+            elif clean[0] == "lw" or clean[0] == "lb" or clean[0] == "lh" or clean[0] == "lbu" or clean[0] == "lhu":
                 res.append(
                     self.I_type(
                         clean[0], self.__reg_map(clean[3]), clean[2], self.__reg_map(clean[1])
@@ -588,12 +632,10 @@ class AssemblyConverter:
                         clean[0], self.__reg_map(clean[2]), clean[3], self.__reg_map(clean[1])
                     )
                 )
-            # print(res)
         elif clean[0] in self.S_instr:
             res.append(
                 self.S_type(clean[0], self.__reg_map(clean[3]), self.__reg_map(clean[1]), clean[2])
             )
-            # print(res)
         elif clean[0] in self.SB_instr:
             res.append(
                 self.SB_type(
@@ -603,10 +645,8 @@ class AssemblyConverter:
                     self.calcJump(clean[3], i),
                 )
             )
-            # print(res)
         elif clean[0] in self.U_instr:
-            res.append(self.U_type(clean[0], clean[1], self.__reg_map(clean[2])))
-            # print(res)
+            res.append(self.U_type(clean[0], clean[2], self.__reg_map(clean[1])))
         elif clean[0] in self.UJ_instr:
             if len(clean) == 3:
                 res.append(
@@ -616,19 +656,19 @@ class AssemblyConverter:
                 res.append(
                     self.UJ_type(clean[0], self.calcJump(clean[1], i), self.__reg_map("x1"))
                 )
-            # print(res)
         elif clean[0] in self.pseudo_instr:
-            # print(clean[0]  + " pseudo")
 
-            if clean[0] == "li":  # need to consider larger than 12 bits
-                # res = self.I_type("addi",self.__reg_map(clean[1]), self.calcJump(clean[2],i), self.__reg_map(clean[1]))
-                if int(clean[2]) > 2**11:
-                    res.append(self.U_type(instr="lui", imm=clean[2], rd=self.__reg_map(clean[1])))
-                res.append(
-                    self.I_type(
-                        "addi", self.__reg_map(clean[1]), clean[2], self.__reg_map(clean[1])
-                    )
-                )
+            if clean[0] == "li":
+                imm = int(clean[2])
+                # Small immediates (-2048 to 2047) can use a single addi with x0
+                if -2048 <= imm <= 2047:
+                    res.append(self.I_type("addi", self.__reg_map("x0"), clean[2], self.__reg_map(clean[1])))
+                else:
+                    # Large immediates need lui + addi
+                    upper20 = (imm + 0x800) >> 12
+                    lower12 = imm - (upper20 << 12)
+                    res.append(self.U_type(instr="lui", imm=upper20, rd=self.__reg_map(clean[1])))
+                    res.append(self.I_type(instr="addi", imm=lower12, rd=self.__reg_map(clean[1]), rs1=self.__reg_map(clean[1])))
             elif clean[0] == "nop":
                 res.append(self.I_type("addi", self.__reg_map("x0"), "0", self.__reg_map("x0")))
             elif clean[0] == "mv":
@@ -649,9 +689,12 @@ class AssemblyConverter:
                     )
                 )
             elif clean[0] == "la":
-                res.append(
-                    self.U_type("auipc", self.calcJump(clean[2], i), self.__reg_map(clean[1]))
-                )
+                # la expands to auipc + addi for PC-relative addressing
+                offset = self.calcJump(clean[2], i)
+                upper20 = (offset + 0x800) >> 12
+                lower12 = offset - (upper20 << 12)
+                res.append(self.U_type("auipc", upper20, self.__reg_map(clean[1])))
+                res.append(self.I_type("addi", self.__reg_map(clean[1]), lower12, self.__reg_map(clean[1])))
             elif clean[0] == "j":
                 res.append(self.UJ_type("jal", self.calcJump(clean[1], i), self.__reg_map("x0")))
             elif clean[0] == "jr":
@@ -676,6 +719,41 @@ class AssemblyConverter:
                         self.__reg_map(clean[2]),
                         self.__reg_map(clean[1]),
                         self.calcJump(clean[3], i),
+                    )
+                )
+            elif clean[0] == "beqz":
+                # beqz rs, offset -> beq rs, x0, offset
+                res.append(
+                    self.SB_type(
+                        "beq",
+                        self.__reg_map(clean[1]),
+                        self.__reg_map("x0"),
+                        self.calcJump(clean[2], i),
+                    )
+                )
+            elif clean[0] == "bnez":
+                # bnez rs, offset -> bne rs, x0, offset
+                res.append(
+                    self.SB_type(
+                        "bne",
+                        self.__reg_map(clean[1]),
+                        self.__reg_map("x0"),
+                        self.calcJump(clean[2], i),
+                    )
+                )
+            elif clean[0] == "seqz":
+                # seqz rd, rs -> sltiu rd, rs, 1
+                res.append(
+                    self.I_type("sltiu", self.__reg_map(clean[2]), "1", self.__reg_map(clean[1]))
+                )
+            elif clean[0] == "snez":
+                # snez rd, rs -> sltu rd, x0, rs
+                res.append(
+                    self.R_type(
+                        "sltu",
+                        self.__reg_map("x0"),
+                        self.__reg_map(clean[2]),
+                        self.__reg_map(clean[1]),
                     )
                 )
         else:
