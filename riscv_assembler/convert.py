@@ -146,6 +146,8 @@ class AssemblyConverter:
         "ebreak",
         "ml_encode",
         "ml_decode",
+        "ml_encode_prot",
+        "ml_decode_prot",
         "ml_sha3_512",
         "ml_sha3_256",
         "ml_shake256",
