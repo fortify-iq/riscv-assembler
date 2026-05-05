@@ -151,6 +151,8 @@ class AssemblyConverter:
         "ml_sha3_512",
         "ml_sha3_256",
         "ml_shake256",
+        "ml_reduce",
+        "ml_protect",
         "CSRRW",
         "CSRRS",
         "CSRRC",
