@@ -180,6 +180,7 @@ class AssemblyConverter:
         "snez",
         "bgt",
         "ble",
+        "ml_reduce_wide",
     ]
 
     all_instr = flatten([R_instr, I_instr, S_instr, SB_instr, U_instr, UJ_instr, pseudo_instr])
@@ -766,6 +767,15 @@ class AssemblyConverter:
                         self.__reg_map(clean[2]),
                         self.__reg_map(clean[1]),
                     )
+                )
+            elif clean[0] == "ml_reduce_wide":
+                # ml_reduce_wide rd, rs -> ml_reduce rd, rs, 2
+                # imm[0]=0 selects reduce (vs protect); imm[1]=1 selects 8-byte
+                # (zero-extended qdigit) write stride instead of the default 4-byte
+                # compact stride. Used when the std-form result feeds an op that
+                # expects 8-byte stride (e.g. ml_mul OP2 in protected mode).
+                res.append(
+                    self.I_type("ml_reduce", self.__reg_map(clean[2]), "2", self.__reg_map(clean[1]))
                 )
         else:
             # debugging
