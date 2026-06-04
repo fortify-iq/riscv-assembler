@@ -775,7 +775,7 @@ class AssemblyConverter:
                 # compact stride. Used when the std-form result feeds an op that
                 # expects 8-byte stride (e.g. ml_mul OP2 in protected mode).
                 res.append(
-                    self.I_type("ml_reduce", self.__reg_map(clean[2]), "2", self.__reg_map(clean[1]))
+                    self.I_type("ml_reduce", self.__reg_map(clean[1]), "2", self.__reg_map(clean[2]))
                 )
         else:
             # debugging
