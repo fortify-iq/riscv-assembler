@@ -69,6 +69,7 @@ class Toolkit:
             "ml_sub",
             "ml_nttpoly",
             "ml_mul",
+            "ml_mulh",
             "div",
             "divu",
             "rem",
