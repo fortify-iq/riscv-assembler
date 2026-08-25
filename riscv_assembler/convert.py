@@ -189,6 +189,7 @@ class AssemblyConverter:
         "snez",
         "bgt",
         "ble",
+        "ml_decode_wide",
         "ml_reduce_wide",
     ]
 
@@ -774,6 +775,20 @@ class AssemblyConverter:
                         "sltu",
                         self.__reg_map("x0"),
                         self.__reg_map(clean[2]),
+                        self.__reg_map(clean[1]),
+                    )
+                )
+            elif clean[0] == "ml_decode_wide":
+                # ml_decode_wide rd, rs, width -> ml_decode rd, rs, width|0x800
+                # imm[11]=1 requests zero-extended 32-bit coefficient slots.
+                width = int(clean[3], 0)
+                if width < 0 or width > 0x3f:
+                    raise ValueError("ml_decode_wide width must fit in imm[5:0]")
+                res.append(
+                    self.I_type(
+                        "ml_decode",
+                        self.__reg_map(clean[2]),
+                        str(width | 0x800),
                         self.__reg_map(clean[1]),
                     )
                 )

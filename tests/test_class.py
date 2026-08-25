@@ -142,3 +142,15 @@ def test_7():
 
 def test_8():
     assert func8() == ["000000b3", "02040293"]
+
+
+def test_ml_decode_wide_sets_high_immediate_flag(tmp_path):
+    source = tmp_path / "decode_wide.s"
+    source.write_text("ml_decode_wide x5 x13 12\n")
+
+    cnv = AssemblyConverter(hexMode=True)
+    encoded = cnv.convert_ret(str(source))
+
+    expected = cnv.I_type("ml_decode", "x13", str(0x800 | 12), "x5")
+    assert encoded == [f"{int(expected, 2):08x}"]
+    assert cnv.instructionExists("ml_decode_wide")

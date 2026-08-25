@@ -141,6 +141,7 @@ class Toolkit:
             "snez",
             "bgt",
             "ble",
+            "ml_decode_wide",
         ]
 
         self.instructions = []
