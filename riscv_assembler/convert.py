@@ -112,6 +112,8 @@ class AssemblyConverter:
         "ml_add",
         "ml_sub",
         "ml_nttpoly",
+        "ml_fuse_nttmul",
+        "ml_fuse_nttmulacc",
         "ml_mul",
         "ml_mulh",
         "ml_p2round",

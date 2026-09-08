@@ -154,3 +154,16 @@ def test_ml_decode_wide_sets_high_immediate_flag(tmp_path):
     expected = cnv.I_type("ml_decode", "x13", str(0x800 | 12), "x5")
     assert encoded == [f"{int(expected, 2):08x}"]
     assert cnv.instructionExists("ml_decode_wide")
+
+
+@pytest.mark.parametrize("mnemonic, expected", [
+    ("ml_fuse_nttmul", "02c6e2db"),
+    ("ml_fuse_nttmulacc", "04c6e2db"),
+])
+def test_fused_matrix_encoding(tmp_path, mnemonic, expected):
+    source = tmp_path / "fused_matrix.s"
+    source.write_text(f"{mnemonic} x5 x13 x12\n")
+    converter = AssemblyConverter(hexMode=True)
+    assert converter.instructionExists(mnemonic)
+    assert converter.convert_ret(str(source)) == [expected]
+    assert f"{int(Toolkit().R_type(mnemonic, 'x13', 'x12', 'x5'), 2):08x}" == expected
