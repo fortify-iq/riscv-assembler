@@ -157,11 +157,11 @@ def test_ml_decode_wide_sets_high_immediate_flag(tmp_path):
 
 
 @pytest.mark.parametrize("mnemonic, expected", [
-    ("ml_fuse_nttmul", "02c6e2db"),
-    ("ml_fuse_nttmulacc", "04c6e2db"),
+    ("ml_strm_nttmul", "02c6e2db"),
+    ("ml_strm_nttmulacc", "04c6e2db"),
 ])
-def test_fused_matrix_encoding(tmp_path, mnemonic, expected):
-    source = tmp_path / "fused_matrix.s"
+def test_stream_buffer_encoding(tmp_path, mnemonic, expected):
+    source = tmp_path / "stream_buffer.s"
     source.write_text(f"{mnemonic} x5 x13 x12\n")
     converter = AssemblyConverter(hexMode=True)
     assert converter.instructionExists(mnemonic)
