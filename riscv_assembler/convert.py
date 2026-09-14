@@ -112,7 +112,7 @@ class AssemblyConverter:
         "ml_add",
         "ml_sub",
         "ml_nttpoly",
-        "ml_strm_nttmul",
+        "ml_strm_nttpolymul",
         "ml_strm_nttpolymuladd",
         "ml_mul",
         "ml_mulh",
