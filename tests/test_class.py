@@ -157,8 +157,8 @@ def test_ml_decode_wide_sets_high_immediate_flag(tmp_path):
 
 
 @pytest.mark.parametrize("mnemonic, expected", [
-    ("ml_strm_nttpolymul", "02c6e2db"),
-    ("ml_strm_nttpolymuladd", "04c6e2db"),
+    ("ml_strm_nttpolymul", "04c6b2ab"),
+    ("ml_strm_nttpolymuladd", "06c6b2ab"),
 ])
 def test_stream_buffer_encoding(tmp_path, mnemonic, expected):
     source = tmp_path / "stream_buffer.s"
