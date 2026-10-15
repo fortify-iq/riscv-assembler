@@ -115,7 +115,6 @@ class AssemblyConverter:
         "ml_strm_nttpolymul",
         "ml_strm_nttpolymuladd",
         "ml_mul",
-        "ml_mulh",
         "ml_p2round",
         "ml_decomp",
         "ml_normchk",
